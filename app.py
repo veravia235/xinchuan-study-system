@@ -6,7 +6,7 @@ from openai import OpenAI
 from pypdf import PdfReader
 import docx2txt
 from langchain_community.vectorstores import FAISS
-from langchain_core.embeddings import Embeddings
+from sentence_transformers import SentenceTransformer
 from sentence_transformers import TransformerEmbeddings
 
 # ==========================================
