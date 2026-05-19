@@ -1,3 +1,8 @@
+streamlit
+openai
 pypdf
 docx2txt
-openai
+faiss-cpu
+sentence-transformers
+langchain-community
+langchain-core
