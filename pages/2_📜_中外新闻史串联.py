@@ -1,5 +1,7 @@
 import streamlit as st
+import os
 from openai import OpenAI
+from brain import search_full_brain
 import json
 
 st.set_page_config(page_title="中外新闻史串联", page_icon="📜", layout="wide")
@@ -7,51 +9,58 @@ st.title("📜 中外新闻史时空纵横线")
 
 base_url = "https://api.deepseek.com/v1"
 
-# 检查权限与大脑
 if "api_key" not in st.session_state or not st.session_state.api_key:
-    st.warning("⚠️ 请先回到主页配置你的 API 密钥！")
+    st.warning("⚠️ 请先回到主页配置你的 DeepSeek API 密钥！")
     st.stop()
-if "active_brain" not in st.session_state or not st.session_state.active_brain:
+if not os.path.exists("xinchuan_brain_text.json"):
     st.warning("⚠️ 请先回到主页上传你的笔记并构建记忆大脑！")
     st.stop()
 
 st.markdown("### 🧙‍♂️ 记忆库时空重构")
-st.caption("点击下方按钮，AI将精读你上传的笔记，自动抽炼出核心考点轴。")
+st.caption("点击下方按钮，AI将开启地毯式打捞，绝不遗漏任何年份考点。")
 
-if st.button("✨ 深度扫描私库并重构历史时空轴"):
-    with st.spinner("正在横跨历史长河，打捞年份、人物与高分语料..."):
-        client = OpenAI(api_key=st.session_state.api_key, base_url=base_url)
-        # 深度检索：打捞文档里的历史发展线索 (k=40 表示拉满检索，获取更全内容)
-        matched_history = st.session_state.active_brain.similarity_search("新闻史 年份 时间 事件 意义 创办 创刊 阶段", k=40)
-        h_context = "\n".join([d.page_content for d in matched_history])
+if st.button("✨ 启动全库地毯式检索 (深度重构)"):
+    with st.spinner("正在从整本笔记中地毯式捞取历史发展线索..."):
+        h_context = search_full_brain("新闻史 年份 时间 事件 创办 创刊 阶段 发展 历史", limit=50)
         
-        h_prompt = f"""请精读以下用户的新闻史笔记片段：\n{h_context}\n
-        请帮我整理出至少10个最硬核的历史时空卡片。必须严格输出为 JSON 数组格式，不要包含任何 markdown 块或多余解释。
-        期望的 JSON 格式如下：
+        h_prompt = f"""你现在是顶级新传考研导师。请执行【严谨的历史时空轴重构】。
+        阅读以下打捞出的所有历史素材碎片：\n{h_context}\n
+        
+        【严厉警告：拒绝错乱与短小】：
+        1. 必须按真实发生的【先后时间顺序】严格排列，绝不允许时间线错乱！
+        2. 拒绝残缺！至少输出 15 到 25 个重大节点。如果提供的素材有断层或语焉不详，请动用你的专业新传知识库进行考研级别的【自动补全】。
+        3. 每个节点的“名解踩分点”和“论述题金句”必须详实饱满（不少于80字），直接给出满分作答标准，绝对不能只写一句废话。
+        4. 行文中绝对禁止使用‘极其’一词，一律视语境替换为‘非常’、‘极度’、‘十分’等。
+        
+        【输出格式】：严格的 JSON 数组。
         [
-          {{"time": "年份或时期", "title": "事件/报刊", "person": "核心人物", "tag": "名解踩分点", "significance": "论述题金句"}}
+          {{"time": "真实的历史年份/时期（如1840年）", "title": "事件/报刊", "person": "核心人物", "tag": "详细饱满的名解踩分点", "significance": "长篇论述题高分语料金句"}}
         ]
-        纪律：禁止使用‘极其’一词，一律根据语境细化替换为‘非常’、‘极度’、‘十分’等表达。
         """
         try:
+            client = OpenAI(api_key=st.session_state.api_key, base_url=base_url)
             res = client.chat.completions.create(
                 model="deepseek-chat",
                 messages=[{"role": "user", "content": h_prompt}],
                 response_format={ 'type': 'json_object' }
             )
-            res_content = res.choices[0].message.content
-            # 处理可能的 json 嵌套
-            res_data = json.loads(res_content)
-            st.session_state.dynamic_history = res_data if isinstance(res_data, list) else res_data.get("history", [])
-            st.success("时空轴重构成功！")
+            res_data = json.loads(res.choices[0].message.content)
+            
+            if isinstance(res_data, list):
+                st.session_state.dynamic_history = res_data
+            else:
+                for key, value in res_data.items():
+                    if isinstance(value, list):
+                        st.session_state.dynamic_history = value
+                        break
+            st.success("🎉 全景高密度时空轴重构成功！")
         except Exception as e:
-            st.error(f"历史数据抽炼失败: {e}")
+            st.error(f"深度挖掘失败: {e}")
 
 st.markdown("---")
 
-# 渲染视图
 if "dynamic_history" in st.session_state and st.session_state.dynamic_history:
-    st.subheader("📁 从你的资料库中自动重构出的独家历史考点轴")
+    st.subheader("📁 从你的整本资料库中榨干出的高密度时空轴")
     for item in st.session_state.dynamic_history:
         st.markdown(f"""
         <div style='padding: 22px; border-radius: 10px; border-left: 6px solid #c05621; background: #fffaf0; margin-bottom: 15px;'>
@@ -62,4 +71,4 @@ if "dynamic_history" in st.session_state and st.session_state.dynamic_history:
         </div>
         """, unsafe_allow_html=True)
 else:
-    st.info("👈 请在上方点击按钮，让 AI 深度解析你的笔记。")
+    st.info("👈 请在左侧侧边栏投喂笔记后，点击上方按钮开启地毯式扫描。")
